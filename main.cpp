@@ -10,8 +10,8 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 
-const int screenWidth = 800;
-const int screenHeight = 800;
+const int screenWidth = 1080;
+const int screenHeight = 1080;
 
 const int numParticles = 1000;
 
