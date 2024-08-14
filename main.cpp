@@ -10,7 +10,7 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 
-const int screenWidth = 1080;
+const int screenWidth = 1920;
 const int screenHeight = 1080;
 
 const int numParticles = 1000;
@@ -244,7 +244,7 @@ int main() {
 
         SetShaderValue(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], &camera.position.x, SHADER_UNIFORM_VEC3);
 
-        updateParticles(0.04f);
+        updateParticles(0.03f);
 
         canvas.BeginMode();
         {
