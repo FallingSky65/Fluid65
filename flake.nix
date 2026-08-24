@@ -17,6 +17,14 @@
                         clang
                         cmake
                         opencv
+
+                        libx11
+                        libxrandr
+                        libxinerama
+                        libxcursor
+                        libxi
+                        libGL
+                        xorgproto
                     ];
                 };
             }
