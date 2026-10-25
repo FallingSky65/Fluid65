@@ -2,7 +2,7 @@
     description = "C++ CMake development environment";
 
     inputs = {
-        nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+        nixpkgs.url = "nixpkgs";
         flake-utils.url = "github:numtide/flake-utils";
     };
 
@@ -16,6 +16,7 @@
                     buildInputs = with pkgs; [
                         clang
                         cmake
+                        emscripten
                         opencv
 
                         libx11
@@ -25,6 +26,8 @@
                         libxi
                         libGL
                         xorgproto
+
+                        python3
                     ];
                 };
             }

@@ -1,4 +1,5 @@
-#version 330
+#version 300 es
+precision highp float;
 
 // Input vertex attributes
 in vec3 vertexPosition;

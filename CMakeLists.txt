@@ -3,6 +3,11 @@ project(Fluid65)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if (EMSCRIPTEN)
+    set(PLATFORM "Web" CACHE STRING "Target platform" FORCE)
+    set(GRAPHICS "GRAPHICS_API_OPENGL_ES3" CACHE STRING "Graphics API" FORCE)
+endif()
+
 # raylib
 find_package(raylib QUIET)
 if (NOT raylib_FOUND)
@@ -31,12 +36,22 @@ if (NOT raylib_cpp_FOUND)
     FetchContent_MakeAvailable(raylib_cpp)
 endif()
 
-# opencv
-find_package(OpenCV REQUIRED)
-
 # This is the main part:
 set(SOURCES main.cpp)
 add_executable(${PROJECT_NAME} ${SOURCES})
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11)
-target_link_libraries(${PROJECT_NAME} PUBLIC raylib raylib_cpp ${OpenCV_LIBS})
 
+if (EMSCRIPTEN)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE PLATFORM_WEB)
+    target_link_libraries(${PROJECT_NAME} PUBLIC raylib raylib_cpp)
+    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+    target_link_options(${PROJECT_NAME} PRIVATE
+        "-sUSE_GLFW=3"
+        "-sASYNCIFY"
+        "-sALLOW_MEMORY_GROWTH=1"
+        "--preload-file" "${CMAKE_SOURCE_DIR}/shaders@shaders"
+    )
+else()
+    find_package(OpenCV REQUIRED)
+    set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 11)
+    target_link_libraries(${PROJECT_NAME} PUBLIC raylib raylib_cpp ${OpenCV_LIBS})
+endif()

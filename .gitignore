@@ -1,5 +1,6 @@
 .cache
 build
+build-web
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles

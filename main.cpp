@@ -1,30 +1,34 @@
 // references: https://matthias-research.github.io/pages/publications/sca03.pdf
 
+// #define DO_RECORD
+// #define FREECAM
+
 #include <climits>
+#include <cstddef>
 #include <cmath>
-#include <opencv2/videoio.hpp>
 #include <random>
 #include <raylib-cpp.hpp>
 #include <raylib.h>
 #include <raymath.h>
-#include <vector>
+#include <rlgl.h>
+#ifdef DO_RECORD
 #include <opencv2/opencv.hpp>
+#include <opencv2/videoio.hpp>
+#endif
+
+#if defined(PLATFORM_WEB)
+    #include <emscripten/emscripten.h>
+#endif
 
 const int screenWidth = 1920;
 const int screenHeight = 1080;
 
-const int numParticles = 1000;
-
-const float sphereSize = 40.0;
-
+const int numParticles = 512;
+const float sphereSize = 20.0;
 const float sampleRadius = 12.0f;
-
 const float restDensity = 0.0001f;
-
 const float gasConstant = 100.0f;
-
 const float viscosity = 0.01f;
-
 const float surfaceTension = 50.0f;
 
 struct Particle {
@@ -40,6 +44,7 @@ struct Particle {
 
 Particle particles[numParticles];
 
+#ifdef DO_RECORD
 cv::Mat textureToMat(Texture2D texture) {
     Image image = LoadImageFromTexture(texture);
     Color* pixels = LoadImageColors(image);
@@ -62,6 +67,7 @@ cv::Mat textureToMat(Texture2D texture) {
 
     return mat_bgr;
 }
+#endif
 
 float W_poly6(Vector3 r, float h) {
     float magnitude = Vector3Length(r);
@@ -200,17 +206,96 @@ void updateParticles(float deltaTime) {
     }
 }
 
-int main() {
+raylib::Window      *window;
+raylib::Camera3D    camera;
+raylib::Mesh        sphere;
+raylib::Shader      *shader;
+raylib::Material    material;
+raylib::RenderTexture2D canvas;
 
+void update() {
+#ifdef FREECAM
+    UpdateCamera(&camera, CAMERA_THIRD_PERSON);
+    SetMousePosition(0, 0);
+#endif
+    
+    shader->SetValue(shader->locs[SHADER_LOC_VECTOR_VIEW], &camera.position.x, SHADER_UNIFORM_VEC3);
+
+    updateParticles(0.03f);
+
+#ifdef DO_RECORD
+    canvas.BeginMode();
+    {
+        ClearBackground(BLACK);
+
+        rlSetClipPlanes(1.0, 100.0);
+        camera.BeginMode();
+        {
+            for (int i = 0; i < numParticles; i++) sphere.Draw(material, MatrixTranslate(particles[i].position.x, particles[i].position.y, particles[i].position.z));
+            //for (int i = 0; i < numParticles; i++) DrawCylinderEx(particles[i].position, Vector3Add(particles[i].position, Vector3Scale(particles[i].acceleration, 0.03f)), 0.05f, 0.05f, 4, RED);
+            //DrawMeshInstanced(sphere, material, transforms.data(), numParticles);
+            //DrawCubeWires(Vector3Zero(), 100.0f, 100.0f, 100.0f, RED);
+            DrawSphereWires(Vector3Zero(), sphereSize, 24, 48, GRAY);
+        }
+        camera.EndMode();
+        //raylib::DrawText(TextFormat("density = %.5f", particles[0].density), 10, 40, 20, WHITE);
+    }
+    canvas.EndMode();
+
+    window->BeginDrawing();
+    {
+        canvas.GetTexture().Draw();
+        window->DrawFPS();
+    }
+    window->EndDrawing();
+#else
+    window->BeginDrawing();
+    {
+        ClearBackground(BLACK);
+
+        rlSetClipPlanes(1.0, 100.0);
+        camera.BeginMode();
+        {
+            for (int i = 0; i < numParticles; i++) sphere.Draw(material, MatrixTranslate(particles[i].position.x, particles[i].position.y, particles[i].position.z));
+            //for (int i = 0; i < numParticles; i++) DrawCylinderEx(particles[i].position, Vector3Add(particles[i].position, Vector3Scale(particles[i].acceleration, 0.03f)), 0.05f, 0.05f, 4, RED);
+            //DrawMeshInstanced(sphere, material, transforms.data(), numParticles);
+            //DrawCubeWires(Vector3Zero(), 100.0f, 100.0f, 100.0f, RED);
+            DrawSphereWires(Vector3Zero(), sphereSize, 24, 48, GRAY);
+        }
+        camera.EndMode();
+        //raylib::DrawText(TextFormat("density = %.5f", particles[0].density), 10, 40, 20, WHITE);
+        window->DrawFPS();
+    }
+    window->EndDrawing();
+#endif
+
+#ifdef DO_RECORD
+    cv::Mat frame = textureToMat(canvas.texture);
+    if (!videoWriter.isOpened()) {
+        cv::Size frameSize = frame.size();
+        videoWriter.open("renders/render.mp4", codec, 30, frameSize, true);
+        if (!videoWriter.isOpened()) TraceLog(LOG_WARNING, "Failed to open videoWriter");
+    }
+
+    videoWriter.write(frame);
+#endif
+}
+
+int main() {
+#ifdef DO_RECORD
     int codec = cv::VideoWriter::fourcc('a', 'v', 'c', '1');
     cv::VideoWriter videoWriter;
+#endif
 
     SetTraceLogLevel(LOG_WARNING);
-    raylib::Window window(screenWidth, screenHeight, "Fluid65");
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+    window = new raylib::Window(screenWidth, screenHeight, "Fluid65");
+    SetWindowMinSize(320, 180);
+    //DisableCursor();
 
-    raylib::Camera3D camera({0.0f, 0.0f, sphereSize*3}, {0.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, 45.0f, CAMERA_PERSPECTIVE);
+    camera = raylib::Camera3D({0.0f, 0.0f, sphereSize*3}, {0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, 45.0f, CAMERA_PERSPECTIVE);
 
-    raylib::Mesh sphere = GenMeshSphere(1.0f, 6, 12);    
+    sphere = GenMeshSphere(1.0f, 6, 12);    
     
     std::default_random_engine generator(GetRandomValue(0, INT_MAX));
     //std::uniform_real_distribution<float> distribution(-50.0, 50.0);
@@ -222,64 +307,30 @@ int main() {
         particles[i].mass = 1.0f;
     }
 
-    Shader shader = LoadShader("shaders/vert.glsl", "shaders/frag.glsl");
-    shader.locs[SHADER_LOC_VECTOR_VIEW] = GetShaderLocation(shader, "viewPos");
+    shader = new raylib::Shader("shaders/vert.glsl", "shaders/frag.glsl");
+    shader->locs[SHADER_LOC_VECTOR_VIEW] = shader->GetLocation("viewPos");
     
     // Ambient light level (some basic lighting)
-    int ambientLoc = GetShaderLocation(shader, "ambient");
-    SetShaderValue(shader, ambientLoc, (float[4]){ 0.1f, 0.1f, 0.1f, 1.0f }, SHADER_UNIFORM_VEC4);
+    int ambientLoc = shader->GetLocation("ambient");
+    shader->SetValue(ambientLoc, (float[4]){ 0.1f, 0.1f, 0.1f, 1.0f }, SHADER_UNIFORM_VEC4);
 
-    Material material = LoadMaterialDefault();
-    material.shader = shader;
+    material = raylib::Material();
+    material.SetShader(*shader);
     material.maps[MATERIAL_MAP_DIFFUSE].color = BLUE;
 
-    raylib::RenderTexture2D canvas(screenWidth, screenHeight);
+    canvas = raylib::RenderTexture2D(screenWidth, screenHeight);
 
-    SetTargetFPS(30);
-
-    while (!window.ShouldClose())
+#if defined(PLATFORM_WEB)
+    emscripten_set_main_loop(update, 0, 1);
+#else
+    SetTargetFPS(60);
+    while (!window->ShouldClose())
     {
-        UpdateCamera(&camera, CAMERA_THIRD_PERSON);
-        SetMousePosition(0, 0);
-
-        SetShaderValue(shader, shader.locs[SHADER_LOC_VECTOR_VIEW], &camera.position.x, SHADER_UNIFORM_VEC3);
-
-        updateParticles(0.03f);
-
-        canvas.BeginMode();
-        {
-            ClearBackground(BLACK);
-            camera.BeginMode();
-            {
-                for (int i = 0; i < numParticles; i++) sphere.Draw(material, MatrixTranslate(particles[i].position.x, particles[i].position.y, particles[i].position.z));
-                //for (int i = 0; i < numParticles; i++) DrawCylinderEx(particles[i].position, Vector3Add(particles[i].position, Vector3Scale(particles[i].acceleration, 0.03f)), 0.05f, 0.05f, 4, RED);
-                //DrawMeshInstanced(sphere, material, transforms.data(), numParticles);
-                //DrawCubeWires(Vector3Zero(), 100.0f, 100.0f, 100.0f, RED);
-                DrawSphereWires(Vector3Zero(), sphereSize, 24, 48, GRAY);
-            }
-            camera.EndMode();
-            //raylib::DrawText(TextFormat("density = %.5f", particles[0].density), 10, 40, 20, WHITE);
-        }
-        canvas.EndMode();
-
-        window.BeginDrawing();
-        {
-            canvas.GetTexture().Draw();
-            window.DrawFPS();
-        }
-        window.EndDrawing();
-
-        cv::Mat frame = textureToMat(canvas.texture);
-        if (!videoWriter.isOpened()) {
-            cv::Size frameSize = frame.size();
-            videoWriter.open("renders/render.mp4", codec, 30, frameSize, true);
-            if (!videoWriter.isOpened()) TraceLog(LOG_WARNING, "Failed to open videoWriter");
-        }
-
-        videoWriter.write(frame);
+        update();
     }
+#endif
 
+#ifdef DO_RECORD
     videoWriter.release();
-    UnloadShader(shader);
-    //UnloadMaterial(material);
+#endif
 }
