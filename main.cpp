@@ -3,6 +3,7 @@
 // #define DO_RECORD
 // #define FREECAM
 
+#include "Functions.hpp"
 #include <climits>
 #include <cstddef>
 #include <cmath>
@@ -265,6 +266,7 @@ void update() {
         camera.EndMode();
         //raylib::DrawText(TextFormat("density = %.5f", particles[0].density), 10, 40, 20, WHITE);
         window->DrawFPS();
+        raylib::DrawText(TextFormat("%d particles", numParticles), 10, 40, 20, WHITE);
     }
     window->EndDrawing();
 #endif
